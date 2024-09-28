@@ -1,7 +1,5 @@
 package httpr
 
-// general purpose http client to be moved out into its own package
-
 import (
 	"bytes"
 	"context"
@@ -129,7 +127,7 @@ func RequestBody(body []byte) RequestOption {
 	}
 }
 
-func RequestQueryParam(key string, value string) RequestOption {
+func QueryParam(key string, value string) RequestOption {
 	return func(r *requestOptions) {
 		queryParams, ok := r.queryParams.Get()
 		if ok {
