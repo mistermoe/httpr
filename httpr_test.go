@@ -14,6 +14,65 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
+func TestQueryParam(t *testing.T) {
+	t.Run("single value", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodGet, "https://hehe.gov", func(r *http.Request) (*http.Response, error) {
+			query := r.URL.Query()
+			assert.Equal(t, "bar", query.Get("foo"))
+			assert.Equal(t, "10", query.Get("baz"))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient()
+
+		resp, err := httpc.Get(
+			context.Background(),
+			"https://hehe.gov",
+			httpr.QueryParam("foo", "bar"),
+			httpr.QueryParam("baz", "10"),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("multi value", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodGet, "https://hehe.gov", func(r *http.Request) (*http.Response, error) {
+			query := r.URL.Query()
+
+			queryValues := query["foo"]
+			assert.Equal(t, 2, len(queryValues))
+			assert.Equal(t, queryValues[0], "bar")
+			assert.Equal(t, queryValues[1], "baz")
+
+			assert.Equal(t, "ham", query.Get("bro"))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient()
+
+		resp, err := httpc.Get(
+			context.Background(),
+			"https://hehe.gov",
+			httpr.QueryParam("foo", "bar"),
+			httpr.QueryParam("foo", "baz"),
+			httpr.QueryParam("bro", "ham"),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+}
+
 func TestStuff(t *testing.T) {
 	client := httpr.NewClient()
 
