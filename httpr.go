@@ -127,6 +127,7 @@ func RequestBody(body []byte) RequestOption {
 	}
 }
 
+// QueryParam adds a query parameter to the request URL
 func QueryParam(key string, value string) RequestOption {
 	return func(r *requestOptions) {
 		queryParams, ok := r.queryParams.Get()
