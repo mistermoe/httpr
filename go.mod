@@ -2,8 +2,6 @@ module github.com/mistermoe/httpr
 
 go 1.22
 
-toolchain go1.23.0
-
 require (
 	github.com/alecthomas/assert/v2 v2.10.0
 	github.com/alecthomas/types v0.16.0
