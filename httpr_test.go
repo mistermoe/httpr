@@ -70,6 +70,9 @@ func TestQueryParam(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
+}
+
+func TestRequestHeader(t *testing.T) {
 
 }
 
