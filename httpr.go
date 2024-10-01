@@ -200,6 +200,18 @@ func (c *Client) Get(ctx context.Context, url string, options ...RequestOption) 
 	return c.SendRequest(ctx, http.MethodGet, url, options...)
 }
 
+func (c *Client) Post(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
+	return c.SendRequest(ctx, http.MethodPost, url, options...)
+}
+
+func (c *Client) Put(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
+	return c.SendRequest(ctx, http.MethodPut, url, options...)
+}
+
+func (c *Client) Delete(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
+	return c.SendRequest(ctx, http.MethodDelete, url, options...)
+}
+
 func (c *Client) SendRequest(ctx context.Context, method string, path string, options ...RequestOption) (resp *http.Response, err error) {
 	opts := requestOptions{}
 
