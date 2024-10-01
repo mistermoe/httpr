@@ -72,8 +72,54 @@ func TestQueryParam(t *testing.T) {
 	})
 }
 
-func TestRequestHeader(t *testing.T) {
+func TestHeaders(t *testing.T) {
+	t.Run("default headers", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
 
+		httpmock.RegisterResponder(http.MethodGet, "https://hehe.gov", func(r *http.Request) (*http.Response, error) {
+			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			assert.Equal(t, "application/json", r.Header.Get("Accept"))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient(
+			httpr.Header("Content-Type", "application/json"),
+			httpr.Header("Accept", "application/json"),
+		)
+
+		resp, err := httpc.Get(context.Background(), "https://hehe.gov")
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("request headers", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodGet, "https://hehe.gov", func(r *http.Request) (*http.Response, error) {
+			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			assert.Equal(t, "application/json", r.Header.Get("Accept"))
+			assert.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient()
+
+		resp, err := httpc.Get(
+			context.Background(),
+			"https://hehe.gov",
+			httpr.RequestHeader("Authorization", "Bearer token"),
+			httpr.RequestHeader("Content-Type", "application/json"),
+			httpr.RequestHeader("Accept", "application/json"),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }
 
 func TestStuff(t *testing.T) {
