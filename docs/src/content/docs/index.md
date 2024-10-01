@@ -4,4 +4,8 @@ description: general purpose http client
 tableOfContents: false
 ---
 
-Hi
+General purpose http client for go
+
+:::caution
+🚧 WIP 👷
+:::

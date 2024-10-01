@@ -6,10 +6,23 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'httpr',
+			customCss: [
+				'@fontsource-variable/roboto-mono/index.css',
+				'./src/styles/custom.css'
+			],
 			social: {
 				github: 'https://github.com/mistermoe/httpr',
 			},
-			sidebar: [],
+			sidebar: [
+				{ 
+					label: 'Getting Started',
+					link: '/'
+				},
+				{
+					label: 'Headers',
+					link: '/headers'
+				}
+			],
 		}),
 	],
 });
