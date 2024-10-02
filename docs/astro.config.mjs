@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightVersions from 'starlight-versions';
 
 // https://astro.build/config
 export default defineConfig({
@@ -29,6 +30,11 @@ export default defineConfig({
 					link: '/query-params'
 				}
 			],
+			plugins: [
+				starlightVersions({
+          versions: [{ slug: '1.0' }],
+        }),
+			]
 		}),
 	],
 });

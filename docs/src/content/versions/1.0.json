@@ -1,0 +1,16 @@
+{
+  "sidebar": [
+    {
+      "label": "Getting Started",
+      "link": "/"
+    },
+    {
+      "label": "Headers",
+      "link": "/headers"
+    },
+    {
+      "label": "Query Params",
+      "link": "/query-params"
+    }
+  ]
+}
