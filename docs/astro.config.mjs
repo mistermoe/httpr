@@ -4,7 +4,7 @@ import starlight from '@astrojs/starlight';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://mistermoe.github.io',
-	base: '/httpr',
+	base: import.meta.env.DEV ? '/' : '/httpr',
 	integrations: [
 		starlight({
 			title: 'httpr',
