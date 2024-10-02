@@ -3,26 +3,24 @@ package httpr
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
-	"net/url"
-	"time"
+	"net/http/httputil"
 
 	"github.com/alecthomas/types/optional"
 )
 
 type Client struct {
-	httpClient           *http.Client
-	baseURL              optional.Option[string]
-	headers              optional.Option[map[string]string]
-	beforeRequestHandler optional.Option[BeforeRequestHandler]
-	afterResponseHandler optional.Option[AfterResponseHandler]
+	httpClient          *http.Client
+	baseURL             optional.Option[string]
+	headers             optional.Option[map[string]string]
+	interceptors        []Interceptor
+	inspect             optional.Option[bool]
+	requestBodyHandler  optional.Option[requestBodyHandler]
+	responseBodyHandler optional.Option[responseBodyHandler]
 }
-
-type BeforeRequestHandler func(c *Client, req *http.Request) error
-type AfterResponseHandler func(c *Client, resp *http.Response) error
 
 func NewClient(options ...ClientOption) *Client {
 	c := &Client{
@@ -30,170 +28,11 @@ func NewClient(options ...ClientOption) *Client {
 	}
 
 	for _, option := range options {
-		option(c)
+		option.Client(c)
 	}
 
 	return c
 
-}
-
-type ClientOption func(*Client)
-
-func BaseURL(baseURL string) ClientOption {
-	return func(c *Client) {
-		c.baseURL = optional.Some(baseURL)
-	}
-}
-
-func Header(key, value string) ClientOption {
-	return func(c *Client) {
-		headers, ok := c.headers.Get()
-		if ok {
-			headers[key] = value
-		} else {
-			c.headers = optional.Some(map[string]string{key: value})
-		}
-	}
-}
-
-func BeforeRequest(handler BeforeRequestHandler) ClientOption {
-	return func(c *Client) {
-		c.beforeRequestHandler = optional.Some(handler)
-	}
-}
-
-func AfterResponse(handler AfterResponseHandler) ClientOption {
-	return func(c *Client) {
-		c.afterResponseHandler = optional.Some(handler)
-	}
-}
-
-func Transport(transport http.RoundTripper) ClientOption {
-	return func(c *Client) {
-		if c.httpClient != nil {
-			c.httpClient.Transport = transport
-		} else {
-			c.httpClient = &http.Client{
-				Transport: transport,
-			}
-		}
-	}
-}
-
-func Timeout(timeout time.Duration) ClientOption {
-	return func(c *Client) {
-		if c.httpClient != nil {
-			c.httpClient.Timeout = timeout
-		} else {
-			c.httpClient = &http.Client{
-				Timeout: timeout,
-			}
-		}
-	}
-}
-
-type requestBodyHandler = func(body any) ([]byte, error)
-type ResponseBodyHandler = func(resp *http.Response) error
-
-type requestOptions struct {
-	requestBody       optional.Option[requestBodyHandler]
-	responseBody      optional.Option[ResponseBodyHandler]
-	responseErrorBody optional.Option[ResponseBodyHandler]
-	queryParams       optional.Option[url.Values]
-	headers           optional.Option[map[string]string]
-}
-
-type RequestOption func(*requestOptions)
-
-func RequestBodyJSON(body any) RequestOption {
-	return func(r *requestOptions) {
-		r.requestBody = optional.Some(json.Marshal)
-	}
-}
-
-func RequestBodyStr(body string) RequestOption {
-	return func(r *requestOptions) {
-		r.requestBody = optional.Some(func(_ any) ([]byte, error) {
-			return []byte(body), nil
-		})
-	}
-}
-
-func RequestBody(body []byte) RequestOption {
-	return func(r *requestOptions) {
-		r.requestBody = optional.Some(func(_ any) ([]byte, error) {
-			return body, nil
-		})
-	}
-}
-
-// QueryParam adds a query parameter to the request URL
-func QueryParam(key string, value string) RequestOption {
-	return func(r *requestOptions) {
-		queryParams, ok := r.queryParams.Get()
-		if ok {
-			queryParams.Add(key, value)
-		} else {
-			queryParams = url.Values{}
-			queryParams.Add(key, value)
-			r.queryParams = optional.Some(queryParams)
-		}
-	}
-}
-
-func RequestHeader(key, value string) RequestOption {
-	return func(r *requestOptions) {
-		headers, ok := r.headers.Get()
-		if ok {
-			headers[key] = value
-		} else {
-			r.headers = optional.Some(map[string]string{key: value})
-		}
-	}
-}
-
-func ResponseBodyJSONInto(val any) RequestOption {
-	return func(r *requestOptions) {
-		handleResponseBody := func(resp *http.Response) error {
-			bodyBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("failed to read response body: %w", err)
-			}
-
-			if err := json.Unmarshal(bodyBytes, val); err != nil {
-				return fmt.Errorf("failed to unmarshal response: %w", err)
-			}
-
-			return nil
-		}
-
-		r.responseBody = optional.Some(handleResponseBody)
-	}
-}
-
-func ResponseErrorBodyInto(val any) RequestOption {
-	return func(r *requestOptions) {
-		handleResponseBody := func(resp *http.Response) error {
-			bodyBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("failed to read response body: %w", err)
-			}
-
-			if err := json.Unmarshal(bodyBytes, val); err != nil {
-				return fmt.Errorf("failed to unmarshal response: %w", err)
-			}
-
-			return nil
-		}
-
-		r.responseErrorBody = optional.Some(handleResponseBody)
-	}
-}
-
-func ResponseBodyInto(handler ResponseBodyHandler) RequestOption {
-	return func(r *requestOptions) {
-		r.responseBody = optional.Some(handler)
-	}
 }
 
 func (c *Client) Get(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
@@ -213,21 +52,30 @@ func (c *Client) Delete(ctx context.Context, url string, options ...RequestOptio
 }
 
 func (c *Client) SendRequest(ctx context.Context, method string, path string, options ...RequestOption) (resp *http.Response, err error) {
-	opts := requestOptions{}
+	opts := requestOptions{
+		inspect:      c.inspect,
+		requestBody:  c.requestBodyHandler,
+		responseBody: c.responseBodyHandler,
+		headers:      c.headers,
+	}
 
 	for _, option := range options {
-		option(&opts)
+		option.Request(&opts)
 	}
 
 	var bodyReader io.Reader
-	requestBodyHandler, rbhok := opts.requestBody.Get()
-	if rbhok {
-		bodyBytes, rerr := requestBodyHandler(nil)
-		if rerr != nil {
-			return nil, fmt.Errorf("failed to prepare request body: %w", err)
+	if requestBodyHandler, ok := opts.requestBody.Get(); ok {
+		var contentType string
+		var err error
+
+		bodyReader, contentType, err = requestBodyHandler()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get request body: %w", err)
 		}
 
-		bodyReader = bytes.NewReader(bodyBytes)
+		if contentType != "" {
+			Header("Content-Type", contentType).Request(&opts)
+		}
 	}
 
 	url := c.baseURL.Default("") + path
@@ -253,11 +101,23 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		}
 	}
 
-	beforeReq, brok := c.beforeRequestHandler.Get()
-	if brok {
-		brerr := beforeReq(c, req)
-		if brerr != nil {
-			return nil, fmt.Errorf("request middleware errored: %w", brerr)
+	if _, ok := opts.inspect.Get(); ok {
+		var bodyBytes []byte
+		if req.Body != nil {
+			bodyBytes, _ = io.ReadAll(req.Body)
+			req.Body.Close()
+			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		}
+
+		dumpReq, err := httputil.DumpRequestOut(req, true)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("Request:\n%s\n", dumpReq)
+
+		// Restore the request body
+		if bodyBytes != nil {
+			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 	}
 
@@ -266,44 +126,33 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
-	responseBodyHandler, rbhok := opts.responseBody.Get()
-	errorBodyHandler, ebhok := opts.responseErrorBody.Get()
-
-	if rbhok || ebhok {
-		defer func() {
-			// TODO: revisit and think through a cleaner approach. currently, if close returns an error, but there was already an error, the close error is lost
-			closeErr := httpResponse.Body.Close()
-			if err != nil {
-				return
-			}
-
-			if closeErr != nil {
-				err = fmt.Errorf("failed to close response body: %w", closeErr)
-			}
-		}()
-	}
-
-	if httpResponse.StatusCode >= http.StatusBadRequest {
-		if ebhok {
-			err := errorBodyHandler(httpResponse)
-			if err != nil {
-				return nil, fmt.Errorf("failed to process error body: %w", err)
-			}
-		}
-	} else {
-		if rbhok {
-			err := responseBodyHandler(httpResponse)
-			if err != nil {
-				return nil, fmt.Errorf("failed to process response body: %w", err)
-			}
-		}
-	}
-
-	afterResp, ok := c.afterResponseHandler.Get()
-	if ok {
-		err := afterResp(c, httpResponse)
+	if _, ok := opts.inspect.Get(); ok {
+		bodyBytes, err := io.ReadAll(httpResponse.Body)
 		if err != nil {
-			return nil, fmt.Errorf("response middleware errored: %w", err)
+			log.Fatalf("failed to dump response body: %v", err)
+		}
+
+		err = httpResponse.Body.Close()
+		if err != nil {
+			log.Fatalf("failed to close dumped response body: %v", err)
+		}
+
+		httpResponse.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		dumpResp, err := httputil.DumpResponse(httpResponse, true)
+		if err != nil {
+			log.Fatalf("failed to dump response: %v", err)
+		}
+
+		fmt.Printf("Response:\n%s\n", dumpResp)
+
+		httpResponse.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
+
+	if responseBodyHandler, ok := opts.responseBody.Get(); ok {
+		err := responseBodyHandler(httpResponse)
+		if err != nil {
+			return nil, fmt.Errorf("failed to handle response body: %w", err)
 		}
 	}
 
