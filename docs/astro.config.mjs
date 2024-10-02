@@ -23,6 +23,10 @@ export default defineConfig({
 				{
 					label: 'Headers',
 					link: '/headers'
+				},
+				{
+					label: 'Query Params',
+					link: '/query-params'
 				}
 			],
 		}),
