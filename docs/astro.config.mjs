@@ -28,6 +28,10 @@ export default defineConfig({
 				{
 					label: 'Query Params',
 					link: '/query-params'
+				},
+				{
+					label: 'Inspect Request',
+					link: '/inspect'
 				}
 			],
 			plugins: [
