@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/alecthomas/types/optional"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ClientOption interface {
@@ -280,4 +283,40 @@ func ResponseBodyBytes(dest *[]byte) Option {
 
 func ResponseBody(handler responseBodyHandler) Option {
 	return responseHandlerOption{handler: handler}
+}
+
+// Option to set custom tracer
+type tracerOption struct {
+	tracer trace.Tracer
+}
+
+func (t tracerOption) Client(c *Client) {
+	c.tracer = t.tracer
+}
+
+func WithTracer(tracer trace.Tracer) ClientOption {
+	return tracerOption{tracer: tracer}
+}
+
+type meterOption struct {
+	meter metric.Meter
+}
+
+func (m meterOption) Client(c *Client) {
+	c.meter = m.meter
+}
+
+func WithMeter(meter metric.Meter) ClientOption {
+	return meterOption{meter: meter}
+}
+
+type disableTelemetryOption struct{}
+
+func (d disableTelemetryOption) Client(c *Client) {
+	c.tracer = trace.NewNoopTracerProvider().Tracer("")
+	c.meter = noop.NewMeterProvider().Meter("")
+}
+
+func DisableTelemetry() ClientOption {
+	return disableTelemetryOption{}
 }

@@ -10,6 +10,11 @@ import (
 	"net/http/httputil"
 
 	"github.com/alecthomas/types/optional"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Client struct {
@@ -20,11 +25,17 @@ type Client struct {
 	inspect             optional.Option[bool]
 	requestBodyHandler  optional.Option[requestBodyHandler]
 	responseBodyHandler optional.Option[responseBodyHandler]
+	tracer              trace.Tracer
+	meter               metric.Meter
+
+	telemetryEnabled bool
 }
 
 func NewClient(options ...ClientOption) *Client {
 	c := &Client{
 		httpClient: &http.Client{},
+		tracer:     otel.GetTracerProvider().Tracer("httpr"),
+		meter:      otel.GetMeterProvider().Meter("httpr"),
 	}
 
 	for _, option := range options {
@@ -52,6 +63,14 @@ func (c *Client) Delete(ctx context.Context, url string, options ...RequestOptio
 }
 
 func (c *Client) SendRequest(ctx context.Context, method string, path string, options ...RequestOption) (resp *http.Response, err error) {
+	ctx, span := c.tracer.Start(ctx, "SendRequest",
+		trace.WithAttributes(
+			attribute.String("http.method", method),
+			attribute.String("http.url", path),
+		),
+	)
+	defer span.End()
+
 	opts := requestOptions{
 		inspect:      c.inspect,
 		requestBody:  c.requestBodyHandler,
@@ -124,6 +143,12 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 	httpResponse, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
+	}
+
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	if _, ok := opts.inspect.Get(); ok {
