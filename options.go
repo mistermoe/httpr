@@ -133,8 +133,6 @@ func (i interceptOption) Request(r *requestOptions) {
 	} else {
 		r.interceptors = append(r.interceptors, in)
 	}
-
-	fmt.Println(r.interceptors)
 }
 
 func Intercept(i Interceptor) Option {
