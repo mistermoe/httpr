@@ -1,8 +1,12 @@
 package httpr_test
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/mistermoe/httpr"
@@ -148,6 +152,41 @@ func TestHeaders(t *testing.T) {
 	})
 }
 
+func TestInspect(t *testing.T) {
+	httpc := httpr.NewClient()
+
+	// Capture stdout
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	resp, err := httpc.Get(context.Background(), "https://jsonplaceholder.typicode.com/posts/1", httpr.Inspect())
+	assert.NoError(t, err)
+
+	// restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// read captured output
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	assert.NoError(t, err)
+
+	capturedOutput := buf.String()
+
+	fmt.Println(capturedOutput)
+
+	assert.NotZero(t, capturedOutput)
+	assert.Contains(t, capturedOutput, "Request:")
+	assert.Contains(t, capturedOutput, "Response:")
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.NotZero(t, body)
+}
+
 // func TestStuff(t *testing.T) {
 // 	client := httpr.NewClient()
 
@@ -192,37 +231,6 @@ func TestHeaders(t *testing.T) {
 // 	assert.NoError(t, err)
 // 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 // 	assert.NotZero(t, post)
-// }
-
-// func TestDump(t *testing.T) {
-// 	httpc := httpr.NewClient()
-
-// 	// Capture stdout
-// 	r, w, _ := os.Pipe()
-// 	oldStdout := os.Stdout
-// 	os.Stdout = w
-
-// 	resp, err := httpc.Get(context.Background(), "https://jsonplaceholder.typicode.com/posts/1", httpr.Dump())
-// 	assert.NoError(t, err)
-
-// 	// restore stdout
-// 	w.Close()
-// 	os.Stdout = oldStdout
-
-// 	// read captured output
-// 	var buf bytes.Buffer
-// 	io.Copy(&buf, r)
-// 	capturedOutput := buf.String()
-
-// 	assert.NotZero(t, capturedOutput)
-// 	assert.Contains(t, capturedOutput, "Request:")
-// 	assert.Contains(t, capturedOutput, "Response:")
-
-// 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-// 	body, err := io.ReadAll(resp.Body)
-// 	assert.NoError(t, err)
-// 	assert.NotZero(t, body)
 // }
 
 // func TestPost(t *testing.T) {

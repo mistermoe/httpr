@@ -31,7 +31,7 @@ type requestOptions struct {
 	responseBody optional.Option[responseBodyHandler]
 	queryParams  optional.Option[url.Values]
 	headers      optional.Option[map[string]string]
-	inspect      optional.Option[bool]
+	interceptors []Interceptor
 }
 
 type baseURLOption string
@@ -90,18 +90,8 @@ func QueryParam(key, value string) RequestOption {
 	return queryParamOption{key, value}
 }
 
-type inspectOption bool
-
-func (d inspectOption) Client(c *Client) {
-	c.inspect = optional.Some(bool(d))
-}
-
-func (d inspectOption) Request(r *requestOptions) {
-	r.inspect = optional.Some(bool(d))
-}
-
 func Inspect() Option {
-	return inspectOption(true)
+	return Intercept(InspectInterceptor)
 }
 
 type timeoutOption time.Duration
@@ -121,8 +111,8 @@ func Timeout(timeout time.Duration) ClientOption {
 }
 
 type Interceptor struct {
-	Before func()
-	After  func()
+	Before func(client *Client, req *http.Request) error
+	After  func(client *Client, resp *http.Response) error
 }
 
 type interceptOption Interceptor
@@ -136,7 +126,18 @@ func (i interceptOption) Client(c *Client) {
 	}
 }
 
-func Intercept(i Interceptor) ClientOption {
+func (i interceptOption) Request(r *requestOptions) {
+	in := Interceptor(i)
+	if r.interceptors == nil {
+		r.interceptors = []Interceptor{in}
+	} else {
+		r.interceptors = append(r.interceptors, in)
+	}
+
+	fmt.Println(r.interceptors)
+}
+
+func Intercept(i Interceptor) Option {
 	return interceptOption(i)
 }
 

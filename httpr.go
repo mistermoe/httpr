@@ -1,13 +1,10 @@
 package httpr
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"net/http/httputil"
 
 	"github.com/alecthomas/types/optional"
 )
@@ -17,7 +14,6 @@ type Client struct {
 	baseURL             optional.Option[string]
 	headers             optional.Option[map[string]string]
 	interceptors        []Interceptor
-	inspect             optional.Option[bool]
 	requestBodyHandler  optional.Option[requestBodyHandler]
 	responseBodyHandler optional.Option[responseBodyHandler]
 }
@@ -52,10 +48,10 @@ func (c *Client) Delete(ctx context.Context, url string, options ...RequestOptio
 
 func (c *Client) SendRequest(ctx context.Context, method string, path string, options ...RequestOption) (resp *http.Response, err error) {
 	opts := requestOptions{
-		inspect:      c.inspect,
 		requestBody:  c.requestBodyHandler,
 		responseBody: c.responseBodyHandler,
 		headers:      c.headers,
+		interceptors: c.interceptors,
 	}
 
 	for _, option := range options {
@@ -78,8 +74,7 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 	}
 
 	url := c.baseURL.Default("") + path
-	queryParams, ok := opts.queryParams.Get()
-	if ok {
+	if queryParams, ok := opts.queryParams.Get(); ok {
 		url += "?" + queryParams.Encode()
 	}
 
@@ -88,35 +83,16 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if headers, hok := c.headers.Get(); hok {
-		for key, value := range headers {
-			req.Header.Add(key, value)
-		}
-	}
-
 	if headers, hok := opts.headers.Get(); hok {
 		for key, value := range headers {
 			req.Header.Add(key, value)
 		}
 	}
 
-	if _, ok := opts.inspect.Get(); ok {
-		var bodyBytes []byte
-		if req.Body != nil {
-			bodyBytes, _ = io.ReadAll(req.Body)
-			req.Body.Close()
-			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		}
-
-		dumpReq, err := httputil.DumpRequestOut(req, true)
+	for _, interceptor := range opts.interceptors {
+		err := interceptor.Before(c, req)
 		if err != nil {
-			return nil, err
-		}
-		log.Printf("Request:\n%s\n", dumpReq)
-
-		// Restore the request body
-		if bodyBytes != nil {
-			req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			return nil, fmt.Errorf("request interceptor errored: %w", err)
 		}
 	}
 
@@ -125,27 +101,11 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
-	if _, ok := opts.inspect.Get(); ok {
-		bodyBytes, err := io.ReadAll(httpResponse.Body)
+	for _, interceptor := range opts.interceptors {
+		err := interceptor.After(c, httpResponse)
 		if err != nil {
-			log.Fatalf("failed to dump response body: %v", err)
+			return nil, fmt.Errorf("response interceptor errored: %w", err)
 		}
-
-		err = httpResponse.Body.Close()
-		if err != nil {
-			log.Fatalf("failed to close dumped response body: %v", err)
-		}
-
-		httpResponse.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-		dumpResp, err := httputil.DumpResponse(httpResponse, true)
-		if err != nil {
-			log.Fatalf("failed to dump response: %v", err)
-		}
-
-		log.Printf("Response:\n%s\n", dumpResp)
-
-		httpResponse.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 
 	if responseBodyHandler, ok := opts.responseBody.Get(); ok {
