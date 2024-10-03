@@ -11,9 +11,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/types/optional"
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/noop"
-	"go.opentelemetry.io/otel/trace"
 )
 
 type ClientOption interface {
@@ -69,7 +66,7 @@ func (h headerOption) Request(r *requestOptions) {
 	}
 }
 
-// Header creates a new Option for setting headers
+// Header creates a new Option for setting headers.
 func Header(key, value string) Option {
 	return headerOption{key, value}
 }
@@ -110,7 +107,6 @@ func Inspect() Option {
 type timeoutOption time.Duration
 
 func (t timeoutOption) Client(c *Client) {
-
 	if c.httpClient != nil {
 		c.httpClient.Timeout = time.Duration(t)
 	} else {
@@ -167,7 +163,7 @@ func RequestBody(contentType string, bodyFunc func() (io.Reader, error)) Option 
 	}
 }
 
-// RequestBodyJSON json marshals whatever is passed in and sets the content type to application/json
+// RequestBodyJSON json marshals whatever is passed in and sets the content type to application/json.
 func RequestBodyJSON(body any) Option {
 	return RequestBody("application/json", func() (io.Reader, error) {
 		b, err := json.Marshal(body)
@@ -178,28 +174,28 @@ func RequestBodyJSON(body any) Option {
 	})
 }
 
-// RequestBodyString sets the content type to text/plain
+// RequestBodyString sets the content type to text/plain.
 func RequestBodyString(body string) Option {
 	return RequestBody("text/plain", func() (io.Reader, error) {
 		return strings.NewReader(body), nil
 	})
 }
 
-// RequestBodyForm sets the content type to application/x-www-form-urlencoded
+// RequestBodyForm sets the content type to application/x-www-form-urlencoded.
 func RequestBodyForm(data url.Values) Option {
 	return RequestBody("application/x-www-form-urlencoded", func() (io.Reader, error) {
 		return strings.NewReader(data.Encode()), nil
 	})
 }
 
-// RequestBodyBytes sets the content type to application/octet-stream
+// RequestBodyBytes sets the content type to application/octet-stream.
 func RequestBodyBytes(contentType string, body []byte) Option {
 	return RequestBody(contentType, func() (io.Reader, error) {
 		return bytes.NewReader(body), nil
 	})
 }
 
-// RequestBodyStream sets the content type to the provided value. good for when you have a stream of data
+// RequestBodyStream sets the content type to the provided value. good for when you have a stream of data.
 func RequestBodyStream(contentType string, body io.Reader) Option {
 	return RequestBody(contentType, func() (io.Reader, error) {
 		return body, nil
@@ -220,33 +216,29 @@ func (r responseHandlerOption) Client(c *Client) {
 	c.responseBodyHandler = optional.Some(r.handler)
 }
 
-func ResponseBodyJSON(successVal, errVal optional.Option[any]) Option {
-	handler := func(resp *http.Response) error {
+func ResponseBodyJSON(successBody, errBody optional.Option[any]) Option {
+	return responseHandlerOption{handler: func(resp *http.Response) error {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
-
 		defer resp.Body.Close()
 
-		if resp.StatusCode >= 400 {
-			if eVal, ok := errVal.Get(); ok {
-				if err := json.Unmarshal(body, eVal); err != nil {
-					return fmt.Errorf("failed to unmarshal error response: %w", err)
-				}
-			}
+		var target optional.Option[any]
+		if resp.StatusCode >= http.StatusBadRequest {
+			target = errBody
 		} else {
-			if sVal, ok := successVal.Get(); ok {
-				if err := json.Unmarshal(body, sVal); err != nil {
-					return fmt.Errorf("failed to unmarshal response: %w", err)
-				}
+			target = successBody
+		}
+
+		if val, ok := target.Get(); ok {
+			if err := json.Unmarshal(body, val); err != nil {
+				return fmt.Errorf("failed to unmarshal %d response body: %w", resp.StatusCode, err)
 			}
 		}
 
 		return nil
-	}
-
-	return responseHandlerOption{handler: handler}
+	}}
 }
 
 func ResponseBodyString(dest *string) Option {
@@ -283,40 +275,4 @@ func ResponseBodyBytes(dest *[]byte) Option {
 
 func ResponseBody(handler responseBodyHandler) Option {
 	return responseHandlerOption{handler: handler}
-}
-
-// Option to set custom tracer
-type tracerOption struct {
-	tracer trace.Tracer
-}
-
-func (t tracerOption) Client(c *Client) {
-	c.tracer = t.tracer
-}
-
-func WithTracer(tracer trace.Tracer) ClientOption {
-	return tracerOption{tracer: tracer}
-}
-
-type meterOption struct {
-	meter metric.Meter
-}
-
-func (m meterOption) Client(c *Client) {
-	c.meter = m.meter
-}
-
-func WithMeter(meter metric.Meter) ClientOption {
-	return meterOption{meter: meter}
-}
-
-type disableTelemetryOption struct{}
-
-func (d disableTelemetryOption) Client(c *Client) {
-	c.tracer = trace.NewNoopTracerProvider().Tracer("")
-	c.meter = noop.NewMeterProvider().Meter("")
-}
-
-func DisableTelemetry() ClientOption {
-	return disableTelemetryOption{}
 }

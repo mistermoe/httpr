@@ -1,0 +1,50 @@
+# This workflow will run tests and lint on: 
+# * every push to main
+# * every pull request.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+
+name: integrity
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Init Hermit
+        uses: cashapp/activate-hermit@v1
+        with:
+          cache: true
+
+      # - name: Build Cache
+      #   uses: ./.github/actions/build-cache
+
+      - name: Test
+        run: just test
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Init Hermit
+        uses: cashapp/activate-hermit@v1
+        with:
+          cache: true
+
+      # - name: Build Cache
+      #   uses: ./.github/actions/build-cache
+        
+      - name: Lint
+        run: just lint
