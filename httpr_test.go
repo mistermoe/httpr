@@ -3,7 +3,6 @@ package httpr_test
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -173,8 +172,6 @@ func TestInspect(t *testing.T) {
 	assert.NoError(t, err)
 
 	capturedOutput := buf.String()
-
-	fmt.Println(capturedOutput)
 
 	assert.NotZero(t, capturedOutput)
 	assert.Contains(t, capturedOutput, "Request:")
