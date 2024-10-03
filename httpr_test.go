@@ -184,6 +184,24 @@ func TestInspect(t *testing.T) {
 	assert.NotZero(t, body)
 }
 
+func TestBaseURL(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder(http.MethodGet, "https://someapi.io", func(_ *http.Request) (*http.Response, error) {
+		return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+	})
+
+	httpc := httpr.NewClient(
+		httpr.BaseURL("https://someapi.io"),
+	)
+
+	resp, err := httpc.Get(context.Background(), "")
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
 // func TestStuff(t *testing.T) {
 // 	client := httpr.NewClient()
 
@@ -199,29 +217,6 @@ func TestInspect(t *testing.T) {
 // 		context.Background(),
 // 		http.MethodGet,
 // 		"https://jsonplaceholder.typicode.com/posts/1",
-// 		httpr.ResponseBodyJSONInto(&post),
-// 	)
-
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-// 	assert.NotZero(t, post)
-// }
-
-// func TestBaseURL(t *testing.T) {
-// 	client := httpr.NewClient(httpr.BaseURL("https://jsonplaceholder.typicode.com"))
-
-// 	type Post struct {
-// 		UserID int    `json:"userId"`
-// 		ID     int    `json:"id"`
-// 		Title  string `json:"title"`
-// 		Body   string `json:"body"`
-// 	}
-
-// 	var post Post
-// 	resp, err := client.SendRequest(
-// 		context.Background(),
-// 		http.MethodGet,
-// 		"/posts/1",
 // 		httpr.ResponseBodyJSONInto(&post),
 // 	)
 
