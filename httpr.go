@@ -30,22 +30,27 @@ func NewClient(options ...ClientOption) *Client {
 	return c
 }
 
+// Get sends a GET request to the specified URL
 func (c *Client) Get(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
 	return c.SendRequest(ctx, http.MethodGet, url, options...)
 }
 
+// Post sends a POST request to the specified URL
 func (c *Client) Post(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
 	return c.SendRequest(ctx, http.MethodPost, url, options...)
 }
 
+// Put sends a PUT request to the specified URL
 func (c *Client) Put(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
 	return c.SendRequest(ctx, http.MethodPut, url, options...)
 }
 
+// Delete sends a DELETE request to the specified URL
 func (c *Client) Delete(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
 	return c.SendRequest(ctx, http.MethodDelete, url, options...)
 }
 
+// SendRequest sends a request to the specified URL with the specified method and options
 func (c *Client) SendRequest(ctx context.Context, method string, path string, options ...RequestOption) (resp *http.Response, err error) {
 	opts := requestOptions{
 		requestBody:  c.requestBodyHandler,
