@@ -3,6 +3,7 @@ package httpr_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -202,6 +203,110 @@ func TestBaseURL(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
+func TestRequestBody(t *testing.T) {
+	t.Run("RequestBodyJSON", func(t *testing.T) {
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		type Post struct {
+			UserID int    `json:"userId"`
+			ID     int    `json:"id"`
+			Title  string `json:"title"`
+			Body   string `json:"body"`
+		}
+
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(req *http.Request) (*http.Response, error) {
+			var p Post
+			reqBody, err := io.ReadAll(req.Body)
+			assert.NoError(t, err)
+
+			contentType := req.Header.Get("Content-Type")
+			assert.Equal(t, "application/json", contentType)
+
+			err = json.Unmarshal(reqBody, &p)
+			assert.NoError(t, err)
+
+			return httpmock.NewBytesResponse(http.StatusCreated, nil), nil
+		})
+
+		post := Post{
+			UserID: 1,
+			ID:     1,
+			Title:  "foo",
+			Body:   "bar",
+		}
+
+		resp, err := client.SendRequest(
+			context.Background(),
+			http.MethodPost,
+			"/posts",
+			httpr.RequestBodyJSON(post),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	})
+
+	t.Run("RequestBodyString", func(t *testing.T) {
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(req *http.Request) (*http.Response, error) {
+			reqBody, err := io.ReadAll(req.Body)
+			assert.NoError(t, err)
+
+			contentType := req.Header.Get("Content-Type")
+			assert.Equal(t, "text/plain", contentType)
+
+			assert.Equal(t, "hello world", string(reqBody))
+
+			return httpmock.NewBytesResponse(http.StatusCreated, nil), nil
+		})
+
+		resp, err := client.SendRequest(
+			context.Background(),
+			http.MethodPost,
+			"/posts",
+			httpr.RequestBodyString("hello world"),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	})
+
+	t.Run("RequestBodyBytes", func(t *testing.T) {
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(req *http.Request) (*http.Response, error) {
+			reqBody, err := io.ReadAll(req.Body)
+			assert.NoError(t, err)
+			contentType := req.Header.Get("Content-Type")
+			assert.Equal(t, "text/plain", contentType)
+
+			assert.Equal(t, "hello world", string(reqBody))
+
+			return httpmock.NewBytesResponse(http.StatusCreated, nil), nil
+		})
+
+		resp, err := client.SendRequest(
+			context.Background(),
+			http.MethodPost,
+			"/posts",
+			httpr.RequestBodyBytes("text/plain", []byte("hello world")),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	})
+}
+
 // func TestStuff(t *testing.T) {
 // 	client := httpr.NewClient()
 
@@ -223,48 +328,6 @@ func TestBaseURL(t *testing.T) {
 // 	assert.NoError(t, err)
 // 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 // 	assert.NotZero(t, post)
-// }
-
-// func TestPost(t *testing.T) {
-// 	client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
-
-// 	type Post struct {
-// 		UserID int    `json:"userId"`
-// 		ID     int    `json:"id"`
-// 		Title  string `json:"title"`
-// 		Body   string `json:"body"`
-// 	}
-
-// 	httpmock.Activate()
-// 	defer httpmock.DeactivateAndReset()
-
-// 	httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(req *http.Request) (*http.Response, error) {
-// 		var p Post
-// 		reqBody, err := io.ReadAll(req.Body)
-// 		assert.NoError(t, err)
-
-// 		err = json.Unmarshal(reqBody, &p)
-// 		assert.NoError(t, err)
-
-// 		return httpmock.NewBytesResponse(http.StatusCreated, nil), nil
-// 	})
-
-// 	post := Post{
-// 		UserID: 1,
-// 		ID:     1,
-// 		Title:  "foo",
-// 		Body:   "bar",
-// 	}
-
-// 	resp, err := client.SendRequest(
-// 		context.Background(),
-// 		http.MethodPost,
-// 		"/posts",
-// 		httpr.RequestBodyJSON(post),
-// 	)
-
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 // }
 
 // func TestResponseErrorBodyInto(t *testing.T) {
