@@ -91,7 +91,7 @@ func QueryParam(key, value string) RequestOption {
 }
 
 func Inspect() Option {
-	return Intercept(InspectInterceptor)
+	return Intercept(Inspector{})
 }
 
 type timeoutOption time.Duration
@@ -110,12 +110,14 @@ func Timeout(timeout time.Duration) ClientOption {
 	return timeoutOption(timeout)
 }
 
-type Interceptor struct {
-	Before func(client *Client, req *http.Request) error
-	After  func(client *Client, resp *http.Response) error
+type Interceptor interface {
+	Before(client *Client, req *http.Request) error
+	After(client *Client, resp *http.Response) error
 }
 
-type interceptOption Interceptor
+type interceptOption struct {
+	Interceptor
+}
 
 func (i interceptOption) Client(c *Client) {
 	in := Interceptor(i)
@@ -136,7 +138,7 @@ func (i interceptOption) Request(r *requestOptions) {
 }
 
 func Intercept(i Interceptor) Option {
-	return interceptOption(i)
+	return interceptOption{i}
 }
 
 type requestBodyHandler func() (io.Reader, string, error)
