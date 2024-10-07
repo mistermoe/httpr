@@ -106,6 +106,10 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 
+	if httpResponse.Request == nil {
+		httpResponse.Request = req
+	}
+
 	for _, interceptor := range opts.interceptors {
 		err := interceptor.After(c, httpResponse)
 		if err != nil {
