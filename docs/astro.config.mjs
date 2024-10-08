@@ -41,6 +41,10 @@ export default defineConfig({
 					link: '/query-params'
 				},
 				{
+					label: 'Request Body',
+					link: '/request-body'
+				},
+				{
 					label: 'Inspect Request',
 					link: '/inspect'
 				}
