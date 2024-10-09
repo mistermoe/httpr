@@ -16,3 +16,16 @@ docs:
   cd docs
   pnpm install
   pnpm start
+
+observe:
+  #!/bin/bash
+  set -euo pipefail
+
+  docker run \
+    --name otel-lgtm \
+    --platform linux/amd64 \
+    -p 3000:3000 \
+    -p 4317:4317 \
+    -p 4318:4318 \
+    -e ENABLE_LOGS_ALL=true \
+    grafana/otel-lgtm
