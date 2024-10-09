@@ -217,7 +217,7 @@ func (r responseHandlerOption) Client(c *Client) {
 	c.responseBodyHandler = optional.Some(r.handler)
 }
 
-func ResponseBodyJSON(successBody, errBody optional.Option[any]) Option {
+func ResponseBodyJSON(successBody any, errBody any) Option {
 	return responseHandlerOption{handler: func(resp *http.Response) error {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -225,15 +225,15 @@ func ResponseBodyJSON(successBody, errBody optional.Option[any]) Option {
 		}
 		defer resp.Body.Close()
 
-		var target optional.Option[any]
+		var target any
 		if resp.StatusCode >= http.StatusBadRequest {
 			target = errBody
 		} else {
 			target = successBody
 		}
 
-		if val, ok := target.Get(); ok {
-			if err := json.Unmarshal(body, val); err != nil {
+		if target != nil {
+			if err := json.Unmarshal(body, target); err != nil {
 				return fmt.Errorf("failed to unmarshal %d response body: %w", resp.StatusCode, err)
 			}
 		}

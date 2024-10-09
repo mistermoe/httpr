@@ -12,6 +12,7 @@ import (
 	"github.com/mistermoe/httpr"
 
 	"github.com/alecthomas/assert/v2"
+	"github.com/alecthomas/types/optional"
 	"github.com/jarcoal/httpmock"
 )
 
@@ -330,48 +331,143 @@ func TestRequestBody(t *testing.T) {
 // 	assert.NotZero(t, post)
 // }
 
-// func TestResponseErrorBodyInto(t *testing.T) {
-// 	type Error struct {
-// 		Message string                  `json:"message"`
-// 		Code    optional.Option[int]    `json:"code"`
-// 		Field   optional.Option[string] `json:"field"`
-// 	}
+func TestResponseBodyJSON(t *testing.T) {
+	t.Run("ResponseBodyJSONSuccess", func(t *testing.T) {
+		type Error struct {
+			Message string                  `json:"message"`
+			Code    optional.Option[int]    `json:"code"`
+			Field   optional.Option[string] `json:"field"`
+		}
 
-// 	httpmock.Activate()
-// 	defer httpmock.DeactivateAndReset()
+		type Post struct {
+			UserID int    `json:"userId"`
+			ID     int    `json:"id"`
+			Title  string `json:"title"`
+			Body   string `json:"body"`
+		}
 
-// 	httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(*http.Request) (*http.Response, error) {
-// 		errResponse := Error{
-// 			Message: "bad title",
-// 			Code:    optional.Some(1001),
-// 			Field:   optional.Some("title"),
-// 		}
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
 
-// 		return httpmock.NewJsonResponse(http.StatusBadRequest, errResponse)
-// 	})
+		httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(*http.Request) (*http.Response, error) {
+			post := Post{
+				UserID: 1,
+				ID:     10,
+				Title:  "Magical Fruit",
+				Body:   "Beans",
+			}
 
-// 	type Post struct {
-// 		UserID int    `json:"userId"`
-// 		ID     int    `json:"id"`
-// 		Title  string `json:"title"`
-// 		Body   string `json:"body"`
-// 	}
+			return httpmock.NewJsonResponse(http.StatusAccepted, post)
+		})
 
-// 	client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
-// 	var successBody Post
-// 	var errBody Error
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+		var successBody Post
+		var errBody Error
 
-// 	resp, err := client.SendRequest(
-// 		context.Background(),
-// 		http.MethodPost,
-// 		"/posts",
-// 		httpr.RequestBodyJSON(Post{Title: "banana phone"}),
-// 		httpr.ResponseBodyJSONInto(&successBody),
-// 		httpr.ResponseErrorBodyInto(&errBody),
-// 	)
+		resp, err := client.SendRequest(
+			context.Background(),
+			http.MethodPost,
+			"/posts",
+			httpr.RequestBodyJSON(Post{Title: "banana phone"}),
+			httpr.ResponseBodyJSON(&successBody, &errBody),
+		)
 
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-// 	assert.NotZero(t, errBody)
-// 	assert.Zero(t, successBody)
-// }
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+		assert.Zero(t, errBody)
+		assert.NotZero(t, successBody)
+
+		assert.Equal(t, "Beans", successBody.Body)
+	})
+
+	t.Run("ResponseBodyJSONError", func(t *testing.T) {
+		type Error struct {
+			Message string                  `json:"message"`
+			Code    optional.Option[int]    `json:"code"`
+			Field   optional.Option[string] `json:"field"`
+		}
+
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/posts", func(*http.Request) (*http.Response, error) {
+			errResponse := Error{
+				Message: "bad title",
+				Code:    optional.Some(1001),
+				Field:   optional.Some("title"),
+			}
+
+			return httpmock.NewJsonResponse(http.StatusBadRequest, errResponse)
+		})
+
+		type Post struct {
+			UserID int    `json:"userId"`
+			ID     int    `json:"id"`
+			Title  string `json:"title"`
+			Body   string `json:"body"`
+		}
+
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+		var successBody Post
+		var errBody Error
+
+		resp, err := client.SendRequest(
+			context.Background(),
+			http.MethodPost,
+			"/posts",
+			httpr.RequestBodyJSON(Post{Title: "banana phone"}),
+			httpr.ResponseBodyJSON(&successBody, &errBody),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.NotZero(t, errBody)
+		assert.Zero(t, successBody)
+	})
+}
+
+func TestResponseBodyString(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder("GET", "https://hehe.gov/posts", func(*http.Request) (*http.Response, error) {
+		return httpmock.NewStringResponse(http.StatusOK, "hello world"), nil
+	})
+
+	client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+	var dest string
+
+	resp, err := client.SendRequest(
+		context.Background(),
+		http.MethodGet,
+		"/posts",
+		httpr.ResponseBodyString(&dest),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "hello world", dest)
+}
+
+func TestResponseBodyBytes(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder("GET", "https://hehe.gov/posts", func(*http.Request) (*http.Response, error) {
+		return httpmock.NewBytesResponse(http.StatusOK, []byte("hello world")), nil
+	})
+
+	client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+	var dest []byte
+
+	resp, err := client.SendRequest(
+		context.Background(),
+		http.MethodGet,
+		"/posts",
+		httpr.ResponseBodyBytes(&dest),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "hello world", string(dest))
+}
