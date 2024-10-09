@@ -45,6 +45,10 @@ export default defineConfig({
 					link: '/request-body'
 				},
 				{
+					label: 'Response Body',
+					link: '/response-body'
+				},
+				{
 					label: 'Inspect Request',
 					link: '/inspect'
 				}
