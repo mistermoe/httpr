@@ -2,6 +2,7 @@ package httpr
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -111,8 +112,8 @@ func Timeout(timeout time.Duration) ClientOption {
 }
 
 type Interceptor interface {
-	Before(client *Client, req *http.Request) error
-	After(client *Client, resp *http.Response) error
+	Before(ctx context.Context, client *Client, req *http.Request) error
+	After(ctx context.Context, client *Client, resp *http.Response) error
 }
 
 type interceptOption struct {

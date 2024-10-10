@@ -8,8 +8,14 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/mistermoe/httpr"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
 	"github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/types/optional"
@@ -470,4 +476,34 @@ func TestResponseBodyBytes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "hello world", string(dest))
+}
+
+func TestObserver(t *testing.T) {
+	ctx := context.Background()
+	exporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithInsecure())
+	assert.NoError(t, err)
+
+	res, err := resource.Merge(resource.Default(),
+		resource.NewWithAttributes(semconv.SchemaURL),
+	)
+
+	assert.NoError(t, err)
+
+	meterProvider := metric.NewMeterProvider(
+		metric.WithReader(metric.NewPeriodicReader(exporter, metric.WithInterval(time.Second*5))),
+		metric.WithResource(res),
+	)
+
+	otel.SetMeterProvider(meterProvider)
+
+	observer, err := httpr.NewObserver()
+	assert.NoError(t, err)
+
+	httpc := httpr.NewClient(httpr.Intercept(observer))
+	resp, err := httpc.Get(ctx, "https://jsonplaceholder.typicode.com/posts/1")
+	assert.NoError(t, err)
+	assert.NotEqual(t, 0, resp.StatusCode)
+
+	err = exporter.Shutdown(ctx)
+	assert.NoError(t, err)
 }

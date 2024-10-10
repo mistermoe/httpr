@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/alecthomas/types/optional"
 )
@@ -95,12 +96,13 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 	}
 
 	for _, interceptor := range opts.interceptors {
-		err := interceptor.Before(c, req)
+		err := interceptor.Before(ctx, c, req)
 		if err != nil {
 			return nil, fmt.Errorf("request interceptor errored: %w", err)
 		}
 	}
 
+	ctx = context.WithValue(ctx, startTimeKey{}, time.Now())
 	httpResponse, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
@@ -111,7 +113,7 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 	}
 
 	for _, interceptor := range opts.interceptors {
-		err := interceptor.After(c, httpResponse)
+		err := interceptor.After(ctx, c, httpResponse)
 		if err != nil {
 			return nil, fmt.Errorf("response interceptor errored: %w", err)
 		}
