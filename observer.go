@@ -13,23 +13,42 @@ import (
 
 type Observer struct {
 	meter             metric.Meter
+	metricPrefix      string
 	requestCtr        metric.Int64Counter
 	roundtripDuration metric.Int64Histogram
 }
 
-func NewObserver() (*Observer, error) {
-	meter := otel.GetMeterProvider().Meter("httpr")
+var _ Interceptor = (*Observer)(nil)
 
-	requestCtr, err := meter.Int64Counter(
-		"client.request_count",
+type ObserverOption func(*Observer)
+
+func WithMetricPrefix(prefix string) ObserverOption {
+	return func(o *Observer) {
+		o.metricPrefix = prefix
+	}
+}
+
+func NewObserver(opts ...ObserverOption) (*Observer, error) {
+	o := &Observer{
+		metricPrefix: "httpr", // Default prefix
+	}
+
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	o.meter = otel.GetMeterProvider().Meter(o.metricPrefix)
+
+	requestCtr, err := o.meter.Int64Counter(
+		fmt.Sprintf("%s.requests", o.metricPrefix),
 		metric.WithDescription("Total number of requests sent"),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request counter: %w", err)
 	}
 
-	roundtripDuration, err := meter.Int64Histogram(
-		"http.client.roundtrip",
+	roundtripDuration, err := o.meter.Int64Histogram(
+		fmt.Sprintf("%s.roundtrip", o.metricPrefix),
 		metric.WithDescription("Duration of HTTP requests"),
 		metric.WithUnit("ms"),
 	)
@@ -37,11 +56,10 @@ func NewObserver() (*Observer, error) {
 		return nil, fmt.Errorf("failed to create request duration histogram: %w", err)
 	}
 
-	return &Observer{
-		meter:             meter,
-		requestCtr:        requestCtr,
-		roundtripDuration: roundtripDuration,
-	}, nil
+	o.requestCtr = requestCtr
+	o.roundtripDuration = roundtripDuration
+
+	return o, nil
 }
 
 func (o *Observer) Handle(ctx context.Context, req *http.Request, next Interceptor) (*http.Response, error) {
@@ -49,22 +67,25 @@ func (o *Observer) Handle(ctx context.Context, req *http.Request, next Intercept
 
 	// Call next interceptor
 	resp, err := next.Handle(ctx, req, nil)
-	if err != nil {
-		return nil, err
-	}
 
 	duration := time.Since(startTime).Milliseconds()
 
-	// After response
-	attrs := metric.WithAttributes(
+	// Prepare attributes
+	attrs := []attribute.KeyValue{
 		attribute.String("http.method", req.Method),
-		attribute.Int("http.status_code", resp.StatusCode),
 		attribute.String("http.url", req.URL.String()),
-		attribute.String("http.domain", req.URL.Host),
-	)
+		attribute.String("http.host", req.URL.Host),
+	}
 
-	o.requestCtr.Add(ctx, 1, attrs)
-	o.roundtripDuration.Record(ctx, duration, attrs)
+	if err != nil {
+		attrs = append(attrs, attribute.String("error", err.Error()))
+	} else {
+		attrs = append(attrs, attribute.Int("http.status_code", resp.StatusCode))
+	}
 
-	return resp, nil
+	// Record metrics
+	o.requestCtr.Add(ctx, 1, metric.WithAttributes(attrs...))
+	o.roundtripDuration.Record(ctx, duration, metric.WithAttributes(attrs...))
+
+	return resp, err
 }

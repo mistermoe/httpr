@@ -511,24 +511,24 @@ func TestObserver(t *testing.T) {
 		attribute.String("http.method", "GET"),
 		attribute.Int("http.status_code", http.StatusOK),
 		attribute.String("http.url", "https://example.com/test"),
-		attribute.String("http.domain", "example.com"),
+		attribute.String("http.host", "example.com"),
 	)
 
 	// Assert on specific metrics
-	requestCountMetric := getMetric(t, data, "client.request_count")
-	assert.NotZero(t, requestCountMetric, "client.request_count metric not found")
+	requestCountMetric := getMetric(t, data, "httpr.requests")
+	assert.NotZero(t, requestCountMetric, "httpr.requests metric not found")
 
 	sumData, ok := requestCountMetric.Data.(metricdata.Sum[int64])
 	assert.True(t, ok, "Expected client.request_count to be Sum[int64]")
 	assert.Equal(t, 1, len(sumData.DataPoints), "Expected one data point for client.request_count")
 	assert.Equal(t, int64(1), sumData.DataPoints[0].Value, "Expected client.request_count to be 1")
 
-	roundtripMetric := getMetric(t, data, "http.client.roundtrip")
-	assert.NotZero(t, roundtripMetric, "http.client.roundtrip metric not found")
+	roundtripMetric := getMetric(t, data, "httpr.roundtrip")
+	assert.NotZero(t, roundtripMetric, "httpr.roundtrip metric not found")
 
 	histogramData, ok := roundtripMetric.Data.(metricdata.Histogram[int64])
-	assert.True(t, ok, "Expected http.client.roundtrip to be a Histogram")
-	assert.Equal(t, 1, len(histogramData.DataPoints), "Expected one data point for http.client.roundtrip")
+	assert.True(t, ok, "Expected httpr.roundtrip to be a Histogram")
+	assert.Equal(t, 1, len(histogramData.DataPoints), "Expected one data point for httpr.roundtrip")
 }
 
 func getMetric(t *testing.T, rm metricdata.ResourceMetrics, name string) *metricdata.Metrics {
