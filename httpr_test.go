@@ -8,14 +8,13 @@ import (
 	"net/http"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/mistermoe/httpr"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata/metricdatatest"
 
 	"github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/types/optional"
@@ -479,31 +478,68 @@ func TestResponseBodyBytes(t *testing.T) {
 }
 
 func TestObserver(t *testing.T) {
-	ctx := context.Background()
-	exporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithInsecure())
-	assert.NoError(t, err)
-
-	res, err := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL),
-	)
-
-	assert.NoError(t, err)
-
-	meterProvider := metric.NewMeterProvider(
-		metric.WithReader(metric.NewPeriodicReader(exporter, metric.WithInterval(time.Second*5))),
-		metric.WithResource(res),
-	)
-
+	rdr := metric.NewManualReader()
+	// Set up test meter provider
+	meterProvider := metric.NewMeterProvider(metric.WithReader(rdr))
 	otel.SetMeterProvider(meterProvider)
 
+	// Create the Observer
 	observer, err := httpr.NewObserver()
 	assert.NoError(t, err)
 
-	httpc := httpr.NewClient(httpr.Intercept(observer))
-	resp, err := httpc.Get(ctx, "https://jsonplaceholder.typicode.com/posts/1")
-	assert.NoError(t, err)
-	assert.NotEqual(t, 0, resp.StatusCode)
+	// Set up mock HTTP server
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
 
-	err = exporter.Shutdown(ctx)
+	httpmock.RegisterResponder("GET", "https://example.com/test",
+		httpmock.NewStringResponder(200, "OK"))
+
+	// Create client with observer
+	client := httpr.NewClient(httpr.Intercept(observer))
+	ctx := context.Background()
+	// Make a request
+	resp, err := client.Get(ctx, "https://example.com/test")
 	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var data metricdata.ResourceMetrics
+	err = rdr.Collect(context.Background(), &data)
+	assert.NoError(t, err)
+
+	// Assert that metrics have the expected attributes
+	metricdatatest.AssertHasAttributes(t, data,
+		attribute.String("http.method", "GET"),
+		attribute.Int("http.status_code", http.StatusOK),
+		attribute.String("http.url", "https://example.com/test"),
+		attribute.String("http.domain", "example.com"),
+	)
+
+	// Assert on specific metrics
+	requestCountMetric := getMetric(t, data, "client.request_count")
+	assert.NotZero(t, requestCountMetric, "client.request_count metric not found")
+
+	sumData, ok := requestCountMetric.Data.(metricdata.Sum[int64])
+	assert.True(t, ok, "Expected client.request_count to be Sum[int64]")
+	assert.Equal(t, 1, len(sumData.DataPoints), "Expected one data point for client.request_count")
+	assert.Equal(t, int64(1), sumData.DataPoints[0].Value, "Expected client.request_count to be 1")
+
+	roundtripMetric := getMetric(t, data, "http.client.roundtrip")
+	assert.NotZero(t, roundtripMetric, "http.client.roundtrip metric not found")
+
+	histogramData, ok := roundtripMetric.Data.(metricdata.Histogram[int64])
+	assert.True(t, ok, "Expected http.client.roundtrip to be a Histogram")
+	assert.Equal(t, 1, len(histogramData.DataPoints), "Expected one data point for http.client.roundtrip")
+}
+
+func getMetric(t *testing.T, rm metricdata.ResourceMetrics, name string) *metricdata.Metrics {
+	t.Helper()
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name == name {
+				return &m
+			}
+		}
+	}
+	t.Logf("Metric %s not found", name)
+	return nil
 }
