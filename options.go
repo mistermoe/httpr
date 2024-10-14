@@ -91,7 +91,7 @@ func QueryParam(key, value string) RequestOption {
 }
 
 func Inspect() Option {
-	return Intercept(Inspector{})
+	return Intercept(Inspector())
 }
 
 type timeoutOption time.Duration
@@ -110,31 +110,16 @@ func Timeout(timeout time.Duration) ClientOption {
 	return timeoutOption(timeout)
 }
 
-type Interceptor interface {
-	Before(client *Client, req *http.Request) error
-	After(client *Client, resp *http.Response) error
-}
-
 type interceptOption struct {
 	Interceptor
 }
 
 func (i interceptOption) Client(c *Client) {
-	in := Interceptor(i)
-	if c.interceptors == nil {
-		c.interceptors = []Interceptor{in}
-	} else {
-		c.interceptors = append(c.interceptors, in)
-	}
+	c.interceptors = append(c.interceptors, i.Interceptor)
 }
 
 func (i interceptOption) Request(r *requestOptions) {
-	in := Interceptor(i)
-	if r.interceptors == nil {
-		r.interceptors = []Interceptor{in}
-	} else {
-		r.interceptors = append(r.interceptors, in)
-	}
+	r.interceptors = append(r.interceptors, i.Interceptor)
 }
 
 func Intercept(i Interceptor) Option {

@@ -94,27 +94,10 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		}
 	}
 
-	for _, interceptor := range opts.interceptors {
-		err := interceptor.Before(c, req)
-		if err != nil {
-			return nil, fmt.Errorf("request interceptor errored: %w", err)
-		}
-	}
-
-	httpResponse, err := c.httpClient.Do(req)
+	chain := Chain(append(opts.interceptors, c.do())...)
+	httpResponse, err := chain.Handle(ctx, req, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
-	}
-
-	if httpResponse.Request == nil {
-		httpResponse.Request = req
-	}
-
-	for _, interceptor := range opts.interceptors {
-		err := interceptor.After(c, httpResponse)
-		if err != nil {
-			return nil, fmt.Errorf("response interceptor errored: %w", err)
-		}
+		return nil, fmt.Errorf("failed to handle request: %w", err)
 	}
 
 	if responseBodyHandler, ok := opts.responseBody.Get(); ok {
@@ -125,4 +108,19 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 	}
 
 	return httpResponse, nil
+}
+
+func (c *Client) do() HandleFunc {
+	return func(_ context.Context, req *http.Request, _ Interceptor) (*http.Response, error) {
+		httpResponse, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to send HTTP request: %w", err)
+		}
+
+		if httpResponse.Request == nil {
+			httpResponse.Request = req
+		}
+
+		return httpResponse, nil
+	}
 }
