@@ -313,29 +313,6 @@ func TestRequestBody(t *testing.T) {
 	})
 }
 
-// func TestStuff(t *testing.T) {
-// 	client := httpr.NewClient()
-
-// 	type Post struct {
-// 		UserID int    `json:"userId"`
-// 		ID     int    `json:"id"`
-// 		Title  string `json:"title"`
-// 		Body   string `json:"body"`
-// 	}
-
-// 	var post Post
-// 	resp, err := client.SendRequest(
-// 		context.Background(),
-// 		http.MethodGet,
-// 		"https://jsonplaceholder.typicode.com/posts/1",
-// 		httpr.ResponseBodyJSONInto(&post),
-// 	)
-
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-// 	assert.NotZero(t, post)
-// }
-
 func TestResponseBodyJSON(t *testing.T) {
 	t.Run("ResponseBodyJSONSuccess", func(t *testing.T) {
 		type Error struct {
