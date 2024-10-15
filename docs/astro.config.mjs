@@ -49,7 +49,11 @@ export default defineConfig({
 					link: '/response-body'
 				},
 				{
-					label: 'Inspect Request',
+					label: 'Interceptors',
+					link: '/interceptors'
+				},
+				{
+					label: 'Inspecting Requests',
 					link: '/inspect'
 				}
 			],
