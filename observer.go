@@ -78,7 +78,7 @@ func (o *Observer) Handle(ctx context.Context, req *http.Request, next Intercept
 	}
 
 	if err != nil {
-		attrs = append(attrs, attribute.String("error", err.Error()))
+		attrs = append(attrs, attribute.Bool("error", true))
 	} else {
 		attrs = append(attrs, attribute.Int("http.status_code", resp.StatusCode))
 	}
