@@ -6,6 +6,12 @@ tableOfContents: true
 
 a try-hard general purpose http client for golang
 
+<div style="display: flex; align-items: center; gap: 4px;">
+  <img src="https://img.shields.io/badge/Go-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go Badge" style="margin-top: 16px">
+  <img src="https://goreportcard.com/badge/github.com/mistermoe/httpr?style=flat-square" alt="Go Report Card">
+  <img src="https://img.shields.io/github/actions/workflow/status/mistermoe/httpr/integrity.yml?style=flat-square&label=integrity" alt="Integrity">
+</div>
+
 ## Rationale
 why does this library exist when [all these](https://awesome-go.com/http-clients/) already do? Why not just use the standard library?
 
