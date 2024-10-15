@@ -53,6 +53,10 @@ export default defineConfig({
 					link: '/interceptors'
 				},
 				{
+					label: 'Observability',
+					link: '/observability'
+				},
+				{
 					label: 'Inspecting Requests',
 					link: '/inspect'
 				}
@@ -61,7 +65,8 @@ export default defineConfig({
 				starlightVersions({
           versions: [{ slug: '1.0' }],
         }),
-			]
+			],
+			lastUpdated: true
 		}),
 	],
 });

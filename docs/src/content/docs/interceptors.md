@@ -3,7 +3,13 @@ title: Interceptors
 tableOfContents: true
 ---
 
-Interceptors allow you to provide custom logic that runs before and/or after an HTTP request is made. Examples of interceptor use cases include logging, authentication, and metrics collection.
+Interceptors can be used to provide custom logic that runs _prior_ to sending the request and/or _after_ receiving a response. Use-cases for interceptors include: 
+* logging
+* observabilitiy
+* retries
+* circuit breaking. 
+
+Specifically, an interceptor is a function that wraps the logic for making an HTTP request. Interceptors can be used to modify the request before it's sent, modify the response before it's returned, or to perform some action before or after the request is made.
 
 ## Creating an Interceptor
 
@@ -92,7 +98,7 @@ func main() {
 :::
 
 
-## Providing Interceptors
+## Using Interceptors
 Interceptors can be provided to the client using the `Intercept` option. You can provide multiple interceptors to the client like so:
 
 ```go

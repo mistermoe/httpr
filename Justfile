@@ -28,4 +28,7 @@ observe:
     -p 4317:4317 \
     -p 4318:4318 \
     -e ENABLE_LOGS_ALL=true \
+    -e GF_AUTH_ANONYMOUS_ENABLED=true \
+    -e GF_AUTH_ANONYMOUS_ORG_ROLE=Admin \
+    -e GF_AUTH_DISABLE_LOGIN_FORM=true \
     grafana/otel-lgtm

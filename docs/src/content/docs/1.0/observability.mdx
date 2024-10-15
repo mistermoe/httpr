@@ -1,0 +1,122 @@
+---
+title: Observability
+tableOfContents: true
+slug: 1.0/observability
+---
+
+import
+
+`httpr` comes with a pre-built interceptor that instruments your HTTP requests with metrics, traces, and logging. This allows you to monitor and debug requests made by your application.
+
+The observability interceptor uses OpenTelemetry (a.k.a OTEL) to collect and export metrics. OTEL is an open-source observability framework that provides a standardized way to collect and export telemetry data (e.g. metrics, traces, and logs). The Open Telemetry Protocol (OTLP) is supported by many observability backends which means the metrics produced by the provided interceptor are exportable to all obserability stacks that support OTLP e.g.
+
+* Prometheus
+* Datadog
+* New Relic
+* Dynatrace
+* Azure Monitor
+* Google Cloud Monitoring
+* AWS CloudWatch
+
+## Example
+
+Here's how you can enable the observability interceptor in your application:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/mistermoe/httpr"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
+	"go.opentelemetry.io/otel/sdk/metric"
+)
+
+func main() {
+	// It's assumed that you've initialized the OpenTelemetry SDK and configured your meter provider.
+
+	observer, err := httpr.NewObserver()
+  if err != nil {
+    log.Fatalf("failed to create observer: %v", err)
+  }
+
+	client := httpr.NewClient(httpr.Intercept(observer))
+
+	// Make a request
+	resp, err := client.Get(context.Background(), "https://httpbin.org/get")
+  defer resp.Body.Close()
+  
+  if err != nil {
+    log.Fatalf("Error: %v\n", err)
+  }
+
+  fmt.Printf("Response status: %s\n", resp.Status)
+}
+```
+
+:::tip
+A full example can be found [here](https://github.com/mistermoe/httpr/blob/main/examples/observability/main.go) that exports metrics to prometheus and can be visualized using Grafana. If you want to run this stack locally, have a look [here](https://github.com/mistermoe/httpr/blob/main/Justfile#L20-L31)
+
+<video controls>
+  <source src="/1.0/httpr-observability.mp4" type="video/mp4" />
+</video>
+
+:::
+
+## Metrics
+
+The `Observer` currently supports two metrics:
+
+| Metric Name       | Type      | Description                               |
+| ----------------- | --------- | ----------------------------------------- |
+| `httpr.requests`  | Counter   | Total number of requests sent             |
+| `httpr.roundtrip` | Histogram | Duration of HTTP requests in milliseconds |
+
+Both metrics include the following attributes:
+
+* `http.method`: The HTTP method used (e.g., GET, POST)
+* `http.url`: The full URL of the request
+* `http.host`: The host part of the URL
+* `http.status_code`: The HTTP status code of the response
+* `error`: The error message if the request failed
+
+## Traces
+
+:::warning
+Tracing is not yet implemented.
+:::
+
+## Logging
+
+:::warning
+Logging is not yet implemented.
+:::
+
+## Custom Metric Prefix
+
+If you want to use a different prefix for your metrics (default is "httpr"), you can use the `WithMetricPrefix` option when creating the `Observer`:
+
+```go
+observer, _ := httpr.NewObserver(httpr.WithMetricPrefix("myapp"))
+```
+
+This will change the metric names to `myapp.requests` and `myapp.roundtrip`.
+
+## Best Practices
+
+1. **Use in Production**: While metrics can be useful in development, they're especially valuable in production environments where you can monitor your application's behavior over time.
+
+2. **Monitor Error Rates**: Keep an eye on the `httpr.requests` metric with the `error` attribute to track error rates for your HTTP requests.
+
+3. **Set Alerts**: Use the `httpr.roundtrip` metric to set alerts for when your HTTP requests are taking longer than expected.
+
+4. **Correlate with Other Metrics**: Combine these HTTP client metrics with other application metrics to get a full picture of your system's performance.
+
+Remember to consider the performance impact of collecting metrics in your application. While the overhead is generally low, it's not zero, especially for high-traffic applications.
+
+```
+```
