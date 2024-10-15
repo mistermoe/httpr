@@ -1,4 +1,4 @@
-a try-hard general purpose http client for golang. hipster docs [here](mistermoe.github.io/httpr/)
+a try-hard general purpose http client for golang. hipster docs [here](https://mistermoe.github.io/httpr/)
 
 ## Table of Contents <!-- omit in toc -->
 - [Rationale](#rationale)
