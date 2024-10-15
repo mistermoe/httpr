@@ -3,8 +3,6 @@ title: Observability
 tableOfContents: true
 ---
 
-import
-
 `httpr` comes with a pre-built interceptor that instruments your HTTP requests with metrics, traces, and logging. This allows you to monitor and debug requests made by your application.
 
 The observability interceptor uses OpenTelemetry (a.k.a OTEL) to collect and export metrics. OTEL is an open-source observability framework that provides a standardized way to collect and export telemetry data (e.g. metrics, traces, and logs). The Open Telemetry Protocol (OTLP) is supported by many observability backends which means the metrics produced by the provided interceptor are exportable to all obserability stacks that support OTLP e.g.

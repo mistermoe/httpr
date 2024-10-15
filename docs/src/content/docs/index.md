@@ -130,4 +130,4 @@ registration successful: 4
 * Unmarshalling response bodies into strong types (for success and error responses)
 * Interceptor support for request/response modification and inspection
 * Built-in request/response inspector for debugging
-* Instrumented with metrics and traces for observability
+* Opt-in OLTP Instrumentation with metrics and traces for observability
