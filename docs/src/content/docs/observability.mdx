@@ -78,7 +78,11 @@ Both metrics include the following attributes:
 - `http.url`: The full URL of the request
 - `http.host`: The host part of the URL
 - `http.status_code`: The HTTP status code of the response
-- `error`: The error message if the request failed
+- `error`: Whether the request resulted in an error (true or false)
+
+:::note
+`error` and `http.status_code` are mutually exclusive. If the request resulted in an error, `http.status_code` will be set to 0.
+:::
 
 ## Traces
 
