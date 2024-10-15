@@ -352,4 +352,5 @@ issues:
   exclude:
     - 'declaration of "err" shadows declaration'
     - 'shadow: declaration of "ok" shadows declaration'
-    - examples/**/*.go
+  exclude-dirs:
+    - examples
