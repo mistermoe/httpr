@@ -1,5 +1,7 @@
 a try-hard general purpose http client for golang. hipster docs [here](https://mistermoe.github.io/httpr/)
 
+![Go Badge](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=fff&style=flat) [![Go Report Card](https://goreportcard.com/badge/github.com/mistermoe/httpr)](https://goreportcard.com/report/github.com/mistermoe/httpr) [![integrity](https://github.com/mistermoe/httpr/actions/workflows/integrity.yml/badge.svg)](https://github.com/mistermoe/httpr/actions/workflows/integrity.yml)
+
 ## Table of Contents <!-- omit in toc -->
 - [Rationale](#rationale)
 - [Getting Started](#getting-started)
