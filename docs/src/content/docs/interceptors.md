@@ -80,7 +80,7 @@ httpc := httpr.NewClient(
 )
 ```
 
-::: note
+:::note
 Interceptors are executed in the order they are provided to the client. The first interceptor provided will be the first to run and the last interceptor provided will be the last to run.
 :::
 
@@ -93,6 +93,6 @@ httpc := httpr.NewClient()
 httpr.Get(context.Background(), "https://api.example.com", httpr.Intercept(auth))
 ```
 
-::: note
+:::note
 Interceptors provided at the client level will run for every request made by the client. Interceptors provided at the request level will only run for that specific request. client level interceptors will run before request level interceptors.
 :::
