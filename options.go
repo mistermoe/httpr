@@ -44,6 +44,17 @@ func BaseURL(baseURL string) ClientOption {
 	return baseURLOption(baseURL)
 }
 
+type httpClientOption http.Client
+
+func (h httpClientOption) Client(c *Client) {
+	httpClient := http.Client(h)
+	c.httpClient = &httpClient
+}
+
+func HTTPClient(h http.Client) ClientOption {
+	return httpClientOption(h)
+}
+
 type headerOption struct {
 	key, value string
 }
