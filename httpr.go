@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 
 	"github.com/alecthomas/types/optional"
@@ -12,7 +13,7 @@ import (
 type Client struct {
 	httpClient          *http.Client
 	baseURL             optional.Option[string]
-	headers             optional.Option[map[string]string]
+	headers             map[string]string
 	interceptors        []Interceptor
 	requestBodyHandler  optional.Option[requestBodyHandler]
 	responseBodyHandler optional.Option[responseBodyHandler]
@@ -55,7 +56,7 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 	opts := requestOptions{
 		requestBody:  c.requestBodyHandler,
 		responseBody: c.responseBodyHandler,
-		headers:      c.headers,
+		headers:      maps.Clone(c.headers),
 		interceptors: c.interceptors,
 	}
 
@@ -88,10 +89,8 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if headers, hok := opts.headers.Get(); hok {
-		for key, value := range headers {
-			req.Header.Add(key, value)
-		}
+	for key, value := range opts.headers {
+		req.Header.Add(key, value)
 	}
 
 	chain := Chain(append(opts.interceptors, c.do())...)
