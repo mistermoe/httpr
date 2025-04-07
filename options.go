@@ -30,7 +30,7 @@ type requestOptions struct {
 	requestBody  optional.Option[requestBodyHandler]
 	responseBody optional.Option[responseBodyHandler]
 	queryParams  optional.Option[url.Values]
-	headers      optional.Option[map[string]string]
+	headers      map[string]string
 	interceptors []Interceptor
 }
 
@@ -60,21 +60,19 @@ type headerOption struct {
 }
 
 func (h headerOption) Client(c *Client) {
-	headers, ok := c.headers.Get()
-	if ok {
-		headers[h.key] = h.value
-	} else {
-		c.headers = optional.Some(map[string]string{h.key: h.value})
+	if c.headers == nil {
+		c.headers = make(map[string]string)
 	}
+
+	c.headers[h.key] = h.value
 }
 
 func (h headerOption) Request(r *requestOptions) {
-	headers, ok := r.headers.Get()
-	if ok {
-		headers[h.key] = h.value
-	} else {
-		r.headers = optional.Some(map[string]string{h.key: h.value})
+	if r.headers == nil {
+		r.headers = make(map[string]string)
 	}
+
+	r.headers[h.key] = h.value
 }
 
 // Header creates a new Option for setting headers.

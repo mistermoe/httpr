@@ -141,6 +141,14 @@ func TestHeaders(t *testing.T) {
 			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
 		})
 
+		httpmock.RegisterResponder(http.MethodGet, "https://hehe2.gov", func(r *http.Request) (*http.Response, error) {
+			// used to ensure that headers sent in a previous request aren't being set in subsequent requests
+			assert.NotEqual(t, "Bearer token", r.Header.Get("Authorization"))
+			assert.NotEqual(t, "1234", r.Header.Get("X-Request-ID"))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
 		httpc := httpr.NewClient(
 			httpr.Header("Content-Type", "application/json"),
 			httpr.Header("Accept", "application/json"),
@@ -155,6 +163,14 @@ func TestHeaders(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		_, err = httpc.Get(
+			context.Background(),
+			"https://hehe2.gov",
+			httpr.Inspect(),
+		)
+
+		assert.NoError(t, err)
 	})
 }
 
