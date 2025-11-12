@@ -208,21 +208,84 @@ func TestInspect(t *testing.T) {
 }
 
 func TestBaseURL(t *testing.T) {
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
+	t.Run("with empty path", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
 
-	httpmock.RegisterResponder(http.MethodGet, "https://someapi.io", func(_ *http.Request) (*http.Response, error) {
-		return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		httpmock.RegisterResponder(http.MethodGet, "https://someapi.io", func(_ *http.Request) (*http.Response, error) {
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient(
+			httpr.BaseURL("https://someapi.io"),
+		)
+
+		resp, err := httpc.Get(context.Background(), "")
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
-	httpc := httpr.NewClient(
-		httpr.BaseURL("https://someapi.io"),
-	)
+	t.Run("with relative path", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
 
-	resp, err := httpc.Get(context.Background(), "")
-	assert.NoError(t, err)
+		httpmock.RegisterResponder(http.MethodGet, "https://someapi.io/users", func(_ *http.Request) (*http.Response, error) {
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+		httpc := httpr.NewClient(
+			httpr.BaseURL("https://someapi.io"),
+		)
+
+		resp, err := httpc.Get(context.Background(), "/users")
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("override with fully qualified URL", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		// Register responder for the override URL, NOT the base URL
+		httpmock.RegisterResponder(http.MethodGet, "https://override.com/api/data", func(r *http.Request) (*http.Response, error) {
+			// Verify the full URL is used, not baseURL + full URL
+			assert.Equal(t, "https://override.com/api/data", r.URL.String())
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient(
+			httpr.BaseURL("https://someapi.io"),
+		)
+
+		// Should use the fully qualified URL and ignore baseURL
+		resp, err := httpc.Get(context.Background(), "https://override.com/api/data")
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("override with http scheme", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		// Test that http:// also works (not just https://)
+		httpmock.RegisterResponder(http.MethodGet, "http://insecure.com/api/data", func(r *http.Request) (*http.Response, error) {
+			assert.Equal(t, "http://insecure.com/api/data", r.URL.String())
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		httpc := httpr.NewClient(
+			httpr.BaseURL("https://someapi.io"),
+		)
+
+		// Should use the fully qualified URL and ignore baseURL
+		resp, err := httpc.Get(context.Background(), "http://insecure.com/api/data")
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }
 
 func TestRequestBody(t *testing.T) {

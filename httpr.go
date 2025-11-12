@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"strings"
 
 	"github.com/alecthomas/types/optional"
 )
@@ -79,7 +80,13 @@ func (c *Client) SendRequest(ctx context.Context, method string, path string, op
 		}
 	}
 
-	url := c.baseURL.Default("") + path
+	// check if the path is a fully qualified URL, if so, use it as is, otherwise prepend the base URL
+	// if it's set. otherwise use the path as provided.
+	url := path
+	if !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
+		url = c.baseURL.Default("") + path
+	}
+
 	if queryParams, ok := opts.queryParams.Get(); ok {
 		url += "?" + queryParams.Encode()
 	}
