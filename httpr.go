@@ -47,6 +47,11 @@ func (c *Client) Put(ctx context.Context, url string, options ...RequestOption) 
 	return c.SendRequest(ctx, http.MethodPut, url, options...)
 }
 
+// Patch sends a PATCH request to the specified URL.
+func (c *Client) Patch(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
+	return c.SendRequest(ctx, http.MethodPatch, url, options...)
+}
+
 // Delete sends a DELETE request to the specified URL.
 func (c *Client) Delete(ctx context.Context, url string, options ...RequestOption) (*http.Response, error) {
 	return c.SendRequest(ctx, http.MethodDelete, url, options...)
