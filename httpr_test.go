@@ -533,6 +533,95 @@ func TestResponseBodyBytes(t *testing.T) {
 	assert.Equal(t, "hello world", string(dest))
 }
 
+func TestPatch(t *testing.T) {
+	t.Run("patch with JSON body", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		type UpdateRequest struct {
+			Title string `json:"title"`
+			Body  string `json:"body"`
+		}
+
+		type UpdateResponse struct {
+			ID    int    `json:"id"`
+			Title string `json:"title"`
+			Body  string `json:"body"`
+		}
+
+		httpmock.RegisterResponder(http.MethodPatch, "https://api.example.com/posts/1",
+			func(req *http.Request) (*http.Response, error) {
+				// Verify the method is PATCH
+				assert.Equal(t, http.MethodPatch, req.Method)
+
+				// Verify content type
+				assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+
+				// Read and verify request body
+				var updateReq UpdateRequest
+				body, err := io.ReadAll(req.Body)
+				assert.NoError(t, err)
+				err = json.Unmarshal(body, &updateReq)
+				assert.NoError(t, err)
+				assert.Equal(t, "Updated Title", updateReq.Title)
+				assert.Equal(t, "Updated Body", updateReq.Body)
+
+				// Return response
+				response := UpdateResponse{
+					ID:    1,
+					Title: updateReq.Title,
+					Body:  updateReq.Body,
+				}
+				return httpmock.NewJsonResponse(http.StatusOK, response)
+			})
+
+		client := httpr.NewClient()
+
+		updateReq := UpdateRequest{
+			Title: "Updated Title",
+			Body:  "Updated Body",
+		}
+
+		var response UpdateResponse
+		resp, err := client.Patch(
+			context.Background(),
+			"https://api.example.com/posts/1",
+			httpr.RequestBodyJSON(updateReq),
+			httpr.ResponseBodyJSON(&response, nil),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 1, response.ID)
+		assert.Equal(t, "Updated Title", response.Title)
+		assert.Equal(t, "Updated Body", response.Body)
+	})
+
+	t.Run("patch with base URL", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodPatch, "https://api.example.com/users/123",
+			func(req *http.Request) (*http.Response, error) {
+				assert.Equal(t, http.MethodPatch, req.Method)
+				return httpmock.NewBytesResponse(http.StatusNoContent, nil), nil
+			})
+
+		client := httpr.NewClient(
+			httpr.BaseURL("https://api.example.com"),
+		)
+
+		resp, err := client.Patch(
+			context.Background(),
+			"/users/123",
+			httpr.RequestBodyString("partial update"),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+	})
+}
+
 func TestObserver(t *testing.T) {
 	rdr := metric.NewManualReader()
 	// Set up test meter provider
