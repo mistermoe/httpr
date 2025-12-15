@@ -31,7 +31,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install, build, and upload site
-        uses: withastro/action@v3
+        uses: withastro/action@v5
         with:
           path: ${{ env.BUILD_PATH }}
           node-version: 20 # The specific version of Node that should be used to build your site. Defaults to 20. (optional)
