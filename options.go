@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -195,6 +196,97 @@ func RequestBodyStream(contentType string, body io.Reader) Option {
 	return RequestBody(contentType, func() (io.Reader, error) {
 		return body, nil
 	})
+}
+
+// MultipartPart represents a single part in a multipart/form-data request body.
+type MultipartPart interface {
+	writeTo(w *multipart.Writer) error
+}
+
+type formFieldPart struct {
+	name  string
+	value string
+}
+
+func (f formFieldPart) writeTo(w *multipart.Writer) error {
+	return w.WriteField(f.name, f.value)
+}
+
+// FormField creates a text field part for a multipart request.
+func FormField(name, value string) MultipartPart {
+	return formFieldPart{name: name, value: value}
+}
+
+type formFilePart struct {
+	fieldName string
+	fileName  string
+	reader    io.Reader
+}
+
+func (f formFilePart) writeTo(w *multipart.Writer) error {
+	part, err := w.CreateFormFile(f.fieldName, f.fileName)
+	if err != nil {
+		return fmt.Errorf("failed to create form file part %q: %w", f.fieldName, err)
+	}
+
+	if _, err := io.Copy(part, f.reader); err != nil {
+		return fmt.Errorf("failed to write form file part %q: %w", f.fieldName, err)
+	}
+
+	return nil
+}
+
+// FormFile creates a file part for a multipart request from an io.Reader.
+func FormFile(fieldName, fileName string, r io.Reader) MultipartPart {
+	return formFilePart{fieldName: fieldName, fileName: fileName, reader: r}
+}
+
+// FormFileBytes creates a file part for a multipart request from a byte slice.
+func FormFileBytes(fieldName, fileName string, data []byte) MultipartPart {
+	return formFilePart{fieldName: fieldName, fileName: fileName, reader: bytes.NewReader(data)}
+}
+
+// RequestBodyMultipart creates a multipart/form-data request body from the provided parts.
+func RequestBodyMultipart(parts ...MultipartPart) Option {
+	return requestBodyOption{
+		handler: func() (io.Reader, string, error) {
+			var buf bytes.Buffer
+			w := multipart.NewWriter(&buf)
+
+			for _, part := range parts {
+				if err := part.writeTo(w); err != nil {
+					return nil, "", fmt.Errorf("failed to write multipart part: %w", err)
+				}
+			}
+
+			if err := w.Close(); err != nil {
+				return nil, "", fmt.Errorf("failed to close multipart writer: %w", err)
+			}
+
+			return &buf, w.FormDataContentType(), nil
+		},
+	}
+}
+
+// RequestBodyMultipartFunc creates a multipart/form-data request body using a callback
+// for full control over the multipart.Writer.
+func RequestBodyMultipartFunc(fn func(w *multipart.Writer) error) Option {
+	return requestBodyOption{
+		handler: func() (io.Reader, string, error) {
+			var buf bytes.Buffer
+			w := multipart.NewWriter(&buf)
+
+			if err := fn(w); err != nil {
+				return nil, "", fmt.Errorf("failed to write multipart body: %w", err)
+			}
+
+			if err := w.Close(); err != nil {
+				return nil, "", fmt.Errorf("failed to close multipart writer: %w", err)
+			}
+
+			return &buf, w.FormDataContentType(), nil
+		},
+	}
 }
 
 type responseBodyHandler func(resp *http.Response) error
