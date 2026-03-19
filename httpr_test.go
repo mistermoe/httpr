@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"testing"
@@ -619,6 +620,173 @@ func TestPatch(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+	})
+}
+
+func TestRequestBodyMultipart(t *testing.T) {
+	t.Run("form fields only", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/upload", func(req *http.Request) (*http.Response, error) {
+			contentType := req.Header.Get("Content-Type")
+			assert.Contains(t, contentType, "multipart/form-data")
+
+			err := req.ParseMultipartForm(10 << 20)
+			assert.NoError(t, err)
+
+			assert.Equal(t, "moe", req.FormValue("username"))
+			assert.Equal(t, "hello world", req.FormValue("description"))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		resp, err := client.Post(
+			context.Background(),
+			"/upload",
+			httpr.RequestBodyMultipart(
+				httpr.FormField("username", "moe"),
+				httpr.FormField("description", "hello world"),
+			),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("file upload", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		fileContent := []byte("file content here")
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/upload", func(req *http.Request) (*http.Response, error) {
+			contentType := req.Header.Get("Content-Type")
+			assert.Contains(t, contentType, "multipart/form-data")
+
+			err := req.ParseMultipartForm(10 << 20)
+			assert.NoError(t, err)
+
+			file, header, err := req.FormFile("document")
+			assert.NoError(t, err)
+			defer file.Close()
+
+			assert.Equal(t, "report.txt", header.Filename)
+
+			body, err := io.ReadAll(file)
+			assert.NoError(t, err)
+			assert.Equal(t, fileContent, body)
+
+			return httpmock.NewBytesResponse(http.StatusCreated, nil), nil
+		})
+
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		resp, err := client.Post(
+			context.Background(),
+			"/upload",
+			httpr.RequestBodyMultipart(
+				httpr.FormFile("document", "report.txt", bytes.NewReader(fileContent)),
+			),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	})
+
+	t.Run("mixed fields and files", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		avatarData := []byte("png-bytes")
+		resumeData := []byte("pdf-bytes")
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/profile", func(req *http.Request) (*http.Response, error) {
+			err := req.ParseMultipartForm(10 << 20)
+			assert.NoError(t, err)
+
+			assert.Equal(t, "moe", req.FormValue("username"))
+			assert.Equal(t, "admin", req.FormValue("role"))
+
+			avatar, avatarHeader, err := req.FormFile("avatar")
+			assert.NoError(t, err)
+			defer avatar.Close()
+			assert.Equal(t, "photo.png", avatarHeader.Filename)
+			avatarBody, _ := io.ReadAll(avatar)
+			assert.Equal(t, avatarData, avatarBody)
+
+			resume, resumeHeader, err := req.FormFile("resume")
+			assert.NoError(t, err)
+			defer resume.Close()
+			assert.Equal(t, "resume.pdf", resumeHeader.Filename)
+			resumeBody, _ := io.ReadAll(resume)
+			assert.Equal(t, resumeData, resumeBody)
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		resp, err := client.Post(
+			context.Background(),
+			"/profile",
+			httpr.RequestBodyMultipart(
+				httpr.FormField("username", "moe"),
+				httpr.FormField("role", "admin"),
+				httpr.FormFile("avatar", "photo.png", bytes.NewReader(avatarData)),
+				httpr.FormFileBytes("resume", "resume.pdf", resumeData),
+			),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("multipart func escape hatch", func(t *testing.T) {
+		httpmock.Activate()
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder("POST", "https://hehe.gov/custom", func(req *http.Request) (*http.Response, error) {
+			err := req.ParseMultipartForm(10 << 20)
+			assert.NoError(t, err)
+
+			assert.Equal(t, "bar", req.FormValue("foo"))
+
+			file, header, err := req.FormFile("data")
+			assert.NoError(t, err)
+			defer file.Close()
+			assert.Equal(t, "data.bin", header.Filename)
+
+			body, _ := io.ReadAll(file)
+			assert.Equal(t, "binary-stuff", string(body))
+
+			return httpmock.NewBytesResponse(http.StatusOK, nil), nil
+		})
+
+		client := httpr.NewClient(httpr.BaseURL("https://hehe.gov"))
+
+		resp, err := client.Post(
+			context.Background(),
+			"/custom",
+			httpr.RequestBodyMultipartFunc(func(w *multipart.Writer) error {
+				if err := w.WriteField("foo", "bar"); err != nil {
+					return err
+				}
+
+				part, err := w.CreateFormFile("data", "data.bin")
+				if err != nil {
+					return err
+				}
+
+				_, err = part.Write([]byte("binary-stuff"))
+				return err
+			}),
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }
 

@@ -45,6 +45,10 @@ export default defineConfig({
 					link: '/request-body'
 				},
 				{
+					label: 'Multipart Requests',
+					link: '/multipart'
+				},
+				{
 					label: 'Response Body',
 					link: '/response-body'
 				},
