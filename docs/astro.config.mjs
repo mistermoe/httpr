@@ -33,6 +33,10 @@ export default defineConfig({
 					link: '/'
 				},
 				{
+					label: 'Client',
+					link: '/client'
+				},
+				{
 					label: 'Headers',
 					link: '/headers'
 				},
