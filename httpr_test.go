@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -855,4 +856,60 @@ func getMetric(t *testing.T, rm metricdata.ResourceMetrics, name string) *metric
 	}
 	t.Logf("Metric %s not found", name)
 	return nil
+}
+
+func TestNoRedirects(t *testing.T) {
+	// newServer redirects /start to /end, and counts the requests /end gets.
+	newServer := func(t *testing.T) (*httptest.Server, *int) {
+		t.Helper()
+		endHits := 0
+		mux := http.NewServeMux()
+		mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/end", http.StatusFound)
+		})
+		mux.HandleFunc("/end", func(w http.ResponseWriter, _ *http.Request) {
+			endHits++
+			w.WriteHeader(http.StatusOK)
+		})
+		server := httptest.NewServer(mux)
+		t.Cleanup(server.Close)
+		return server, &endHits
+	}
+
+	t.Run("follows redirects by default", func(t *testing.T) {
+		server, endHits := newServer(t)
+
+		resp, err := httpr.NewClient().Get(context.Background(), server.URL+"/start")
+		assert.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 1, *endHits)
+	})
+
+	t.Run("returns the redirect", func(t *testing.T) {
+		server, endHits := newServer(t)
+
+		resp, err := httpr.NewClient(httpr.NoRedirects()).Get(context.Background(), server.URL+"/start")
+		assert.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusFound, resp.StatusCode)
+		assert.Equal(t, "/end", resp.Header.Get("Location"))
+		assert.Equal(t, 0, *endHits)
+	})
+
+	t.Run("applies to a client given with HTTPClient without changing it", func(t *testing.T) {
+		server, endHits := newServer(t)
+		given := http.Client{}
+
+		httpc := httpr.NewClient(httpr.HTTPClient(given), httpr.NoRedirects())
+		resp, err := httpc.Get(context.Background(), server.URL+"/start")
+		assert.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusFound, resp.StatusCode)
+		assert.Equal(t, 0, *endHits)
+		assert.True(t, given.CheckRedirect == nil)
+	})
 }
