@@ -120,6 +120,25 @@ func Timeout(timeout time.Duration) ClientOption {
 	return timeoutOption(timeout)
 }
 
+type noRedirectsOption struct{}
+
+func (noRedirectsOption) Client(c *Client) {
+	if c.httpClient == nil {
+		c.httpClient = &http.Client{}
+	}
+
+	c.httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+}
+
+// NoRedirects makes the client return a redirect (3xx) response as is, rather
+// than following it. Like Timeout, it changes the client's http.Client, so pass
+// it after HTTPClient.
+func NoRedirects() ClientOption {
+	return noRedirectsOption{}
+}
+
 type interceptOption struct {
 	Interceptor
 }

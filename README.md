@@ -129,6 +129,7 @@ registration successful: 4
 
 ## Features
 * BaseURL configuration - set base url for all requests
+* Timeout and redirect configuration, or bring your own `http.Client`
 * Setting custom headers both globally and per request
 * Setting custom query params
 * Supplying strongly typed request bodies 
