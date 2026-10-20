@@ -1,6 +1,6 @@
 module github.com/mistermoe/httpr
 
-go 1.23.4
+go 1.24
 
 require (
 	github.com/alecthomas/assert/v2 v2.10.0
@@ -11,7 +11,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.31.0
 	go.opentelemetry.io/otel/sdk v1.31.0
 	go.opentelemetry.io/otel/sdk/metric v1.31.0
-	gopkg.in/dnaeon/go-vcr.v3 v3.2.0
+	gopkg.in/dnaeon/go-vcr.v4 v4.0.7
 )
 
 require (
